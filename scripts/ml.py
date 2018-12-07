@@ -126,7 +126,8 @@ if VERBOSE:
     print(66*'-')
 
 CWD = os.getcwd()
-OUTPREF = CWD+'/sga.%d.%s.%s.%d.%s.%d.cnn1d.%d.%.0e.logistic' % (MI, SCLR, RDCN, NP, CLST, NC, EP, LR)
+OUTPREF = CWD+'/sga.%d.%s.%s.%d.%s.%d.cnn1d.%d.%.0e.logistic' \
+          % (MI, SCLR, RDCN, NP, CLST, NC, EP, LR)
 with open(OUTPREF+'.out', 'w') as out:
     out.write('# ' + 66*'-' + '\n')
     out.write('# input summary\n')
@@ -151,7 +152,7 @@ EPS = 0.025 # np.finfo(np.float32).eps
 R = pickle.load(open(CWD+'/sga.r.pickle', 'rb'))[:MI]
 UT = pickle.load(open(CWD+'/sga.corr.t.pickle', 'rb'))
 ST = pickle.load(open(CWD+'/sga.spin.t.pickle', 'rb'))
-UDAT = pickle.load(open(CWD+'/sga.corr.pickle', 'rb'))[:MI]
+UDAT = pickle.load(open(CWD+'/sga.corr.pickle', 'rb'))[:MI].astype(np.float64)
 SDAT = pickle.load(open(CWD+'/sga.spin.pickle', 'rb'))[:MI]
 # data shape
 UND, UNS, UNF = UDAT.shape
@@ -239,7 +240,8 @@ def build_keras_cnn1d():
     model.compile(loss='binary_crossentropy', optimizer=nadam, metrics=['mae', 'acc'])
     return model
 
-NN = KerasClassifier(build_keras_cnn1d, epochs=EP, batch_size=16, shuffle=True, verbose=VERBOSE, callbacks=[History()])
+NN = KerasClassifier(build_keras_cnn1d, epochs=EP, batch_size=16,
+                     shuffle=True, verbose=VERBOSE, callbacks=[History()])
 
 # clustering dictionary
 CLSTS = {'agglomerative': AgglomerativeClustering(n_clusters=NC),
@@ -258,7 +260,8 @@ pickle.dump(FUDOM, open(CWD+'/sga.%d.%s.fudat.k.pickle' % (MI, SCLR), 'wb'))
 pickle.dump(FUDAT.reshape(UND, UNS, FUNF), open(CWD+'/sga.%d.%s.fudat.pickle' % (MI, SCLR), 'wb'))
 FUDAT = np.concatenate((np.real(FUDAT), np.imag(FUDAT)), axis=1)
 SUDAT = SCLRS[SCLR].fit_transform(FUDAT)
-pickle.dump(SUDAT.reshape(UND, UNS, 2*FUNF), open(CWD+'/sga.%d.%s.sudat.pickle' % (MI, SCLR), 'wb'))
+pickle.dump(SUDAT.reshape(UND, UNS, 2*FUNF), open(CWD+'/sga.%d.%s.sudat.pickle' \
+                                                  % (MI, SCLR), 'wb'))
 
 if VERBOSE:
     print('unsupervised data scaled')
@@ -267,7 +270,8 @@ if VERBOSE:
 # pca reduce unsupervised data
 PUDAT = RDCNS['pca'].fit_transform(SUDAT)
 EVAR = RDCNS['pca'].explained_variance_ratio_
-pickle.dump(PUDAT.reshape(UND, UNS, len(EVAR)), open(CWD+'/sga.%d.%s.pudat.pickle' % (MI, SCLR), 'wb'))
+pickle.dump(PUDAT.reshape(UND, UNS, len(EVAR)),
+            open(CWD+'/sga.%d.%s.pudat.pickle' % (MI, SCLR), 'wb'))
 
 if VERBOSE:
     print('unsupervised data pca reduced')
@@ -287,13 +291,15 @@ with open(OUTPREF+'.out', 'a') as out:
 
 # reduction of unsupervised data
 try:
-    RUDAT = pickle.load(open(CWD+'/sga.%d.%s.%s.%d.rudat.pickle' % (MI, SCLR, RDCN, NP), 'rb')).reshape(UND*UNS, NP)
+    RUDAT = pickle.load(open(CWD+'/sga.%d.%s.%s.%d.rudat.pickle' \
+                             % (MI, SCLR, RDCN, NP), 'rb')).reshape(UND*UNS, NP)
     if VERBOSE:
         print('nonlinearly reduced unsupervised data loaded from file')
 except:
-    if RDCN != 'none' and RDCN != 'pca':
+    if RDCN not in ('none', 'pca'):
         RUDAT = RDCNS[RDCN].fit_transform(PUDAT)
-        pickle.dump(RUDAT.reshape(UND, UNS, NP), open(CWD+'/sga.%d.%s.%s.%d.rudat.pickle' % (MI, SCLR, RDCN, NP), 'wb'))
+        pickle.dump(RUDAT.reshape(UND, UNS, NP), open(CWD+'/sga.%d.%s.%s.%d.rudat.pickle' \
+                                                      % (MI, SCLR, RDCN, NP), 'wb'))
         if RDCN == 'tsne' and VERBOSE:
             print(66*'-')
         if VERBOSE:
@@ -309,10 +315,12 @@ IUCM = np.argsort(UCM)
 for i in range(NC):
     UPRED[UPRED == IUCM[i]] = i+NC
 UPRED -= NC
-pickle.dump(UPRED.reshape(UND, UNS), open(CWD+'/sga.%d.%s.%s.%d.%s.%d.upred.pickle' % (MI, SCLR, RDCN, NP, CLST, NC), 'wb'))
+pickle.dump(UPRED.reshape(UND, UNS), open(CWD+'/sga.%d.%s.%s.%d.%s.%d.upred.pickle' \
+                                          % (MI, SCLR, RDCN, NP, CLST, NC), 'wb'))
 UCM = [np.mean(RS[UPRED == i]) for i in range(NC)]
 UCS = [np.std(RS[UPRED == i]) for i in range(NC)]
-CUPRED = np.array([np.histogram(UPRED.reshape(UND, UNS)[i], np.arange(NC+1))[0] for i in range(UND)])
+CUPRED = np.array([np.histogram(UPRED.reshape(UND, UNS)[i],
+                                np.arange(NC+1))[0] for i in range(UND)])
 UTRANS = R[np.argmin(np.std(CUPRED, 1))]
 
 if VERBOSE:
@@ -337,7 +345,9 @@ with open(OUTPREF+'.out', 'a') as out:
     out.write('# r\t' + NC*'c%d\t' % tuple(np.arange(NC)) + 'd\n')
     out.write('# ' + np.max([66, 10+8*NC])*'-' + '\n')
     for i in range(UND):
-        out.write('  %0.2f\t' % R[i] + NC*'%04d\t' % tuple(CUPRED[i])+'%d\n' % np.argmax(CUPRED[i]))
+        out.write('  %0.2f\t' % R[i] + \
+                  NC*'%04d\t' % tuple(CUPRED[i]) + \
+                  '%d\n' % np.argmax(CUPRED[i]))
     out.write('# ' + np.max([66, 10+8*NC])*'-' + '\n')
     out.write('# totals\n')
     out.write('# ' + 66*'-'+'\n')
@@ -356,9 +366,10 @@ with open(OUTPREF+'.out', 'a') as out:
     out.write('  %0.4f\n' % UTRANS)
 
 # scale supervised data
-SCLRS[SCLR].fit(np.real(SDAT.reshape(SND*SNS, SNF)[(UPRED == 0) | (UPRED == NC-1)]).astype(np.float64))
-SSDAT = SCLRS[SCLR].transform(SDAT.reshape(SND*SNS, SNF).astype(np.float64))
-pickle.dump(SSDAT.reshape(SND, SNS, SNF), open(CWD+'/sga.%d.%s.ssdat.pickle' % (MI, SCLR), 'wb'))
+SCLRS[SCLR].fit(np.real(SDAT.reshape(SND*SNS, SNF)[(UPRED == 0) | (UPRED == NC-1)]))
+SSDAT = SCLRS[SCLR].transform(SDAT.reshape(SND*SNS, SNF))
+pickle.dump(SSDAT.reshape(SND, SNS, SNF), open(CWD+'/sga.%d.%s.ssdat.pickle' \
+                                               % (MI, SCLR), 'wb'))
 
 if VERBOSE:
     print('supervised data scaled')
@@ -379,8 +390,9 @@ if VERBOSE:
 
 # predict classification data
 SPROB = NN.predict_proba(SSDAT[:, :, np.newaxis])[:, 1].reshape(SND, SNS)
-SPREF = CWD+'/sga.%d.%s.%s.%d.%s.%d.%d.%.0e.sprob.pickle' % (MI, SCLR, RDCN, NP, CLST, NC, EP, LR)
-pickle.dump(SPROB.reshape(UND, UNS), open(SPREF, 'wb'))
+pickle.dump(SPROB.reshape(UND, UNS),
+            open(CWD+'/sga.%d.%s.%s.%d.%s.%d.%d.%.0e.sprob.pickle' \
+                 % (MI, SCLR, RDCN, NP, CLST, NC, EP, LR), 'wb'))
 MSPROB = np.mean(SPROB, 1)
 SSPROB = np.std(SPROB, 1)
 SPRED = SPROB.round()
@@ -532,20 +544,20 @@ if PLOT:
         ''' plot of reduced sample space '''
         fig = plt.figure()
         grid = ImageGrid(fig, 111,
-                        nrows_ncols=(1, 2),
-                        axes_pad=2.0,
-                        share_all=True,
-                        cbar_location="right",
-                        cbar_mode="single",
-                        cbar_size="4%",
-                        cbar_pad=0.4)
-        for i in range(len(grid)):
-            grid[i].spines['right'].set_visible(False)
-            grid[i].spines['top'].set_visible(False)
-            grid[i].xaxis.set_ticks_position('bottom')
-            grid[i].yaxis.set_ticks_position('left')
+                         nrows_ncols=(1, 2),
+                         axes_pad=2.0,
+                         share_all=True,
+                         cbar_location="right",
+                         cbar_mode="single",
+                         cbar_size="4%",
+                         cbar_pad=0.4)
+        for j in range(len(grid)):
+            grid[j].spines['right'].set_visible(False)
+            grid[j].spines['top'].set_visible(False)
+            grid[j].xaxis.set_ticks_position('bottom')
+            grid[j].yaxis.set_ticks_position('left')
         cbd = grid[0].scatter(RUDAT[:, 0], RUDAT[:, 1], c=RS, cmap=CM, s=120, alpha=0.05,
-                            edgecolors='none')
+                              edgecolors='none')
         grid[0].set_aspect('equal', 'datalim')
         grid[0].set_xlabel(r'$x_0$')
         grid[0].set_ylabel(r'$x_1$')
@@ -579,7 +591,8 @@ if PLOT:
             serrb = STRANS+(-1)**(j+1)*SERR
             ax.axvline(serrb, color=CM(SCALE(serrb)), alpha=0.50, linestyle='--')
         ax.scatter(R, MSPROB, color=CM(SCALE(R)), s=240, edgecolors='none', marker='*')
-        ax.text(STRANS+np.diff(R)[0], .1, r'$r_{\mathrm{supervised}} = %.4f \pm %.4f$' % (STRANS, SERR))
+        ax.text(STRANS+np.diff(R)[0], .1,
+                r'$r_{\mathrm{supervised}} = %.4f \pm %.4f$' % (STRANS, SERR))
         ax.set_ylim(0.0, 1.0)
         for tick in ax.get_xticklabels():
             tick.set_rotation(16)

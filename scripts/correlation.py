@@ -7,12 +7,9 @@ Created on Mon Jul 02 21:24:48 2018
 
 import argparse
 import os
-import sys
 import pickle
 import numpy as np
 import numba as nb
-from numba import types
-from numba.extending import overload_method
 from tqdm import tqdm
 
 
@@ -48,9 +45,9 @@ def roll(a, sh):
 def correlation(t, dat, corr):
     ''' calculates correlation for sample '''
     # loop through time values
-    for k in range(0, t.size):
+    for u in range(0, t.size):
         # standard time autocorrelation at time j from time i
-        corr[k] = np.mean(np.multiply(dat, roll(dat, t[k]))+np.multiply(dat, roll(dat, -t[k])))/2
+        corr[u] = np.mean(np.multiply(dat, roll(dat, t[u]))+np.multiply(dat, roll(dat, -t[u])))/2
     # return correlation
     return corr
 
@@ -93,7 +90,8 @@ if __name__ == '__main__':
         if VERBOSE:
             client_info()
         # submit futures to client for computation
-        OPERS = [delayed(correlation)(CT, DAT[i, j], CORR[i, j]) for i in range(NR) for j in range(NS)]
+        OPERS = [delayed(correlation)(CT, DAT[i, j], CORR[i, j]) \
+                 for i in range(NR) for j in range(NS)]
         FUTURES = CLIENT.compute(OPERS)
         # progress bar
         if VERBOSE:

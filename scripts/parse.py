@@ -6,7 +6,6 @@ Created on Mon Jul 02 21:24:12 2018
 """
 
 import argparse
-import sys
 import os
 import pickle
 import numpy as np
@@ -40,9 +39,11 @@ if VERBOSE:
     print('r parameters and feature time domain dumped')
 # parse data
 if VERBOSE:
-    DAT = np.array([np.loadtxt(DIR+FLS[i], dtype=np.int16)[NF:, 1].reshape(-1, NF) for i in tqdm(range(len(FLS)))])
+    DAT = np.array([np.loadtxt(DIR+FLS[i], dtype=np.int16)[NF:, 1].reshape(-1, NF) \
+                    for i in tqdm(range(len(FLS)))])
 else:
-    DAT = np.array([np.loadtxt(DIR+FLS[i], dtype=np.int16)[NF:, 1].reshape(-1, NF) for i in range(len(FLS))])
+    DAT = np.array([np.loadtxt(DIR+FLS[i], dtype=np.int16)[NF:, 1].reshape(-1, NF) \
+                    for i in range(len(FLS))])
 # dump data
 pickle.dump(DAT, open(CWD+'/sga.spin.pickle', 'wb'))
 if VERBOSE:
