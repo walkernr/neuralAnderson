@@ -33,15 +33,15 @@ PARSER.add_argument('-rd', '--reduction', help='supervised dimension reduction m
 PARSER.add_argument('-np', '--projections', help='number of embedding projections',
                     type=int, default=2)
 PARSER.add_argument('-cl', '--clustering', help='clustering method',
-                    type=str, default='agglomerative')
+                    type=str, default='spectral')
 PARSER.add_argument('-nc', '--clusters', help='number of clusters',
-                    type=int, default=3)
+                    type=int, default=4)
 PARSER.add_argument('-bk', '--backend', help='keras backend',
                     type=str, default='tensorflow')
 PARSER.add_argument('-ep', '--epochs', help='number of epochs',
-                    type=int, default=8)
+                    type=int, default=16)
 PARSER.add_argument('-lr', '--learning_rate', help='learning rate for neural network',
-                    type=float, default=0.0001)
+                    type=float, default=1e-3)
 
 # parse arguments
 ARGS = PARSER.parse_args()
@@ -121,7 +121,7 @@ if VERBOSE:
     print('backend:                   %s' % BACKEND)
     print('network:                   %s' % 'cnn1d')
     print('epochs:                    %d' % EP)
-    print('learning rate:             %.0e' % LR)
+    print('learning rate:             %.2e' % LR)
     print('fitting function:          %s' % 'logistic')
     print(66*'-')
 
@@ -144,7 +144,7 @@ with open(OUTPREF+'.out', 'w') as out:
     out.write('# backend:                   %s\n' % BACKEND)
     out.write('# network:                   %s\n' % 'cnn1d')
     out.write('# epochs:                    %d\n' % EP)
-    out.write('# learning rate:             %.0e\n' % LR)
+    out.write('# learning rate:             %.2e\n' % LR)
     out.write('# fitting function:          %s\n' % 'logistic')
 
 EPS = 0.025 # np.finfo(np.float32).eps
@@ -152,8 +152,8 @@ EPS = 0.025 # np.finfo(np.float32).eps
 R = pickle.load(open(CWD+'/sga.r.pickle', 'rb'))[:MI]
 UT = pickle.load(open(CWD+'/sga.corr.t.pickle', 'rb'))
 ST = pickle.load(open(CWD+'/sga.spin.t.pickle', 'rb'))
-UDAT = pickle.load(open(CWD+'/sga.corr.pickle', 'rb'))[:MI].astype(np.float64)
-SDAT = pickle.load(open(CWD+'/sga.spin.pickle', 'rb'))[:MI]
+UDAT = pickle.load(open(CWD+'/sga.corr.pickle', 'rb'))[:MI]
+SDAT = pickle.load(open(CWD+'/sga.spin.pickle', 'rb'))[:MI].astype(np.float32)
 # data shape
 UND, UNS, UNF = UDAT.shape
 SND, SNS, SNF = SDAT.shape
@@ -240,7 +240,7 @@ def build_keras_cnn1d():
     model.compile(loss='binary_crossentropy', optimizer=nadam, metrics=['mae', 'acc'])
     return model
 
-NN = KerasClassifier(build_keras_cnn1d, epochs=EP, batch_size=16,
+NN = KerasClassifier(build_keras_cnn1d, epochs=EP, batch_size=32,
                      shuffle=True, verbose=VERBOSE, callbacks=[History()])
 
 # clustering dictionary
@@ -309,14 +309,18 @@ except:
     _, RUNF = RUDAT.shape
 
 # clustering
-UPRED = CLSTS[CLST].fit_predict(RUDAT)
-UCM = [np.mean(RS[UPRED == i]) for i in range(NC)]
-IUCM = np.argsort(UCM)
-for i in range(NC):
-    UPRED[UPRED == IUCM[i]] = i+NC
-UPRED -= NC
-pickle.dump(UPRED.reshape(UND, UNS), open(CWD+'/sga.%d.%s.%s.%d.%s.%d.upred.pickle' \
-                                          % (MI, SCLR, RDCN, NP, CLST, NC), 'wb'))
+try:
+    UPRED = pickle.load(open(CWD+'/sga.%d.%s.%s.%d.%s.%d.upred.pickle' \
+                             % (MI, SCLR, RDCN, NP, CLST, NC), 'wb')).reshape(UND*UNS)
+except:
+    UPRED = CLSTS[CLST].fit_predict(RUDAT)
+    UCM = [np.mean(RS[UPRED == i]) for i in range(NC)]
+    IUCM = np.argsort(UCM)
+    for i in range(NC):
+        UPRED[UPRED == IUCM[i]] = i+NC
+    UPRED -= NC
+    pickle.dump(UPRED.reshape(UND, UNS), open(CWD+'/sga.%d.%s.%s.%d.%s.%d.upred.pickle' \
+                                              % (MI, SCLR, RDCN, NP, CLST, NC), 'wb'))
 UCM = [np.mean(RS[UPRED == i]) for i in range(NC)]
 UCS = [np.std(RS[UPRED == i]) for i in range(NC)]
 CUPRED = np.array([np.histogram(UPRED.reshape(UND, UNS)[i],
