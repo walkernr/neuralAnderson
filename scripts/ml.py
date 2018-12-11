@@ -407,13 +407,13 @@ except:
 
 # fit neural network to training data and predict classification data
 try:
-    LOSS = pickle.load(open(CWD+'/sga.%d.%s.%s.%d.%s.%d.%d.%.0e.loss.pickle' \
+    LOSS = pickle.load(open(CWD+'/sga.%d.%s.%s.%d.%s.%d.cnn1d.%d.%.0e.loss.pickle' \
                             % (MI, SCLR, RDCN, NP, CLST, NC, EP, LR), 'rb'))
-    MAE = pickle.load(open(CWD+'/sga.%d.%s.%s.%d.%s.%d.%d.%.0e.mae.pickle' \
+    MAE = pickle.load(open(CWD+'/sga.%d.%s.%s.%d.%s.%d.cnn1d.%d.%.0e.mae.pickle' \
                            % (MI, SCLR, RDCN, NP, CLST, NC, EP, LR), 'rb'))
-    ACC = pickle.load(open(CWD+'/sga.%d.%s.%s.%d.%s.%d.%d.%.0e.acc.pickle' \
+    ACC = pickle.load(open(CWD+'/sga.%d.%s.%s.%d.%s.%d.cnn1d.%d.%.0e.acc.pickle' \
                            % (MI, SCLR, RDCN, NP, CLST, NC, EP, LR), 'rb'))
-    SPROB = pickle.load(open(CWD+'/sga.%d.%s.%s.%d.%s.%d.%d.%.0e.sprob.pickle' \
+    SPROB = pickle.load(open(CWD+'/sga.%d.%s.%s.%d.%s.%d.cnn1d.%d.%.0e.sprob.pickle' \
                              % (MI, SCLR, RDCN, NP, CLST, NC, EP, LR), 'rb'))
     if VERBOSE:
         print(66*'-')
@@ -428,11 +428,11 @@ except:
     LOSS = NN.model.history.history['loss']
     MAE = NN.model.history.history['mean_absolute_error']
     ACC = NN.model.history.history['acc']
-    pickle.dump(LOSS, open(CWD+'/sga.%d.%s.%s.%d.%s.%d.%d.%.0e.loss.pickle' \
+    pickle.dump(LOSS, open(CWD+'/sga.%d.%s.%s.%d.%s.%d.cnn1d.%d.%.0e.loss.pickle' \
                            % (MI, SCLR, RDCN, NP, CLST, NC, EP, LR), 'wb'))
-    pickle.dump(MAE, open(CWD+'/sga.%d.%s.%s.%d.%s.%d.%d.%.0e.mae.pickle' \
+    pickle.dump(MAE, open(CWD+'/sga.%d.%s.%s.%d.%s.%d.cnn1d.%d.%.0e.mae.pickle' \
                           % (MI, SCLR, RDCN, NP, CLST, NC, EP, LR), 'wb'))
-    pickle.dump(ACC, open(CWD+'/sga.%d.%s.%s.%d.%s.%d.%d.%.0e.acc.pickle' \
+    pickle.dump(ACC, open(CWD+'/sga.%d.%s.%s.%d.%s.%d.cnn1d.%d.%.0e.acc.pickle' \
                           % (MI, SCLR, RDCN, NP, CLST, NC, EP, LR), 'wb'))
     if VERBOSE:
         print(125*'-')
@@ -440,7 +440,7 @@ except:
         print(66*'-')
     # predict classification data
     SPROB = NN.predict_proba(SSDAT[:, :, np.newaxis])[:, 1].reshape(SND, SNS)
-    pickle.dump(SPROB, open(CWD+'/sga.%d.%s.%s.%d.%s.%d.%d.%.0e.sprob.pickle' \
+    pickle.dump(SPROB, open(CWD+'/sga.%d.%s.%s.%d.%s.%d.cnn1d.%d.%.0e.sprob.pickle' \
                             % (MI, SCLR, RDCN, NP, CLST, NC, EP, LR), 'wb'))
 
 MSPROB = np.mean(SPROB, 1)
