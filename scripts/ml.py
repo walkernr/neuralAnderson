@@ -450,6 +450,9 @@ SPRED = SPROB.round()
 # transition prediction
 FITG = (1.0, UTRANS)
 STRANS, SERR, SDOM, SVAL = odr_fit(MSPROB, SSPROB)
+pickle.dump(np.array([STRANS, SERR], dtype=np.float32),
+            open(CWD+'/sga.%d.%s.%s.%d.%s.%d.cnn1d.%d.%.0e.strans.pickle' \
+                 % (MI, SCLR, RDCN, NP, CLST, NC, EP, LR), 'wb'))
 
 if VERBOSE:
     print(66*'-')
