@@ -29,7 +29,7 @@ if 'b100' in CWD:
 if 'b150' in CWD:
     NF = 600
 # data file listing
-FLS = os.listdir(DIR)
+FLS = [file for file in os.listdir(DIR) if '.dat' in file]
 # r-values (parameter for density of states)
 R = np.array([np.float32(FLS[i][6:10]) for i in range(len(FLS))])
 # dump r-values and feature time domain
