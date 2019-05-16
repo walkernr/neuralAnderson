@@ -446,6 +446,7 @@ except:
 MSPROB = np.mean(SPROB, 1)
 SSPROB = np.std(SPROB, 1)
 SPRED = SPROB.round()
+SCM = [np.mean(RS[SPRED.reshape(-1) == i]) for i in range(2)]
 
 # transition prediction
 FITG = (1.0, UTRANS)
@@ -656,6 +657,41 @@ if PLOT:
         ax.set_ylabel(r'$\mathrm{Probability}$')
         fig.savefig(OUTPREF+'.spred.png')
 
+    def plot_semb():
+        ''' plot of reduced sample space '''
+        fig = plt.figure()
+        grid = ImageGrid(fig, 111,
+                         nrows_ncols=(1, 2),
+                         axes_pad=2.0,
+                         share_all=True,
+                         cbar_location="right",
+                         cbar_mode="single",
+                         cbar_size="4%",
+                         cbar_pad=0.4)
+        for j in range(len(grid)):
+            grid[j].spines['right'].set_visible(False)
+            grid[j].spines['top'].set_visible(False)
+            grid[j].xaxis.set_ticks_position('bottom')
+            grid[j].yaxis.set_ticks_position('left')
+        cbd = grid[0].scatter(RUDAT[:, 0], RUDAT[:, 1], c=RS, cmap=CM, s=120, alpha=0.05,
+                              edgecolors='none')
+        grid[0].set_aspect('equal', 'datalim')
+        grid[0].set_xlabel(r'$x_0$')
+        grid[0].set_ylabel(r'$x_1$')
+        grid[0].set_title(r'$\mathrm{(a)\enspace Sample\enspace Embedding}$', y=1.02)
+        for j in range(2):
+            grid[1].scatter(RUDAT[SPRED.reshape(-1) == j, 0], RUDAT[SPRED.reshape(-1) == j, 1],
+                            c=np.array(CM(SCALE(SCM[j])))[np.newaxis, :], s=120, alpha=0.05,
+                            edgecolors='none')
+        grid[1].set_aspect('equal', 'datalim')
+        grid[1].set_xlabel(r'$x_0$')
+        grid[1].set_ylabel(r'$x_1$')
+        grid[1].set_title(r'$\mathrm{(b)\enspace Classification\enspace Embedding}$', y=1.02)
+        cbar = grid[0].cax.colorbar(cbd)
+        cbar.solids.set(alpha=1)
+        grid[0].cax.toggle_label(True)
+        fig.savefig(OUTPREF+'.semb.png')
+
     plot_udat()
     plot_rfudat()
     plot_ifudat()
@@ -663,6 +699,7 @@ if PLOT:
     plot_ipca()
     plot_emb()
     plot_spred()
+    plot_semb()
 
     if VERBOSE:
         print('plots saved')
