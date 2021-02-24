@@ -12,10 +12,18 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
 from TanhScaler import TanhScaler
 from sklearn.decomposition import PCA, KernelPCA
-from sklearn.manifold import Isomap, LocallyLinearEmbedding
-from MulticoreTSNE import MulticoreTSNE as TSNE
+from sklearn.manifold import Isomap, LocallyLinearEmbedding, TSNE
 from sklearn.cluster import AgglomerativeClustering, KMeans, SpectralClustering
 from scipy.odr import ODR, Model, RealData
+import tensorflow as tf
+import tensorflow as tf
+from tensorflow.keras import backend as K
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv1D, AveragePooling1D, GlobalAveragePooling1D, Dropout, Dense
+from tensorflow.keras.optimizers import Nadam
+from tensorflow.keras.wrappers.scikit_learn import KerasClassifier
+from tensorflow.keras.callbacks import History
+
 
 # parse command line
 PARSER = argparse.ArgumentParser()
@@ -36,8 +44,8 @@ PARSER.add_argument('-cl', '--clustering', help='clustering method',
                     type=str, default='spectral')
 PARSER.add_argument('-nc', '--clusters', help='number of clusters',
                     type=int, default=4)
-PARSER.add_argument('-bk', '--backend', help='keras backend',
-                    type=str, default='tensorflow')
+# PARSER.add_argument('-bk', '--backend', help='keras backend',
+                    # type=str, default='tensorflow')
 PARSER.add_argument('-ep', '--epochs', help='number of epochs',
                     type=int, default=16)
 PARSER.add_argument('-lr', '--learning_rate', help='learning rate for neural network',
@@ -56,29 +64,32 @@ RDCN = ARGS.reduction
 NP = ARGS.projections
 CLST = ARGS.clustering
 NC = ARGS.clusters
-BACKEND = ARGS.backend
+# BACKEND = ARGS.backend
 EP = ARGS.epochs
 LR = ARGS.learning_rate
 
 # random seed
 SEED = 256
 np.random.seed(SEED)
+tf.random.set_seed(SEED)
 # environment variables
-os.environ['KERAS_BACKEND'] = BACKEND
-if BACKEND == 'tensorflow':
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-    from tensorflow import set_random_seed
-    set_random_seed(SEED)
-if PARALLEL:
-    os.environ['MKL_NUM_THREADS'] = str(THREADS)
-    os.environ['GOTO_NUM_THREADS'] = str(THREADS)
-    os.environ['OMP_NUM_THREADS'] = str(THREADS)
-    os.environ['openmp'] = 'True'
-from keras.models import Sequential
-from keras.layers import Conv1D, AveragePooling1D, GlobalAveragePooling1D, Dropout, Dense
-from keras.optimizers import Nadam
-from keras.wrappers.scikit_learn import KerasClassifier
-from keras.callbacks import History
+# os.environ['KERAS_BACKEND'] = BACKEND
+# if BACKEND == 'tensorflow':
+    # os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+    # from tensorflow import set_random_seed
+    # set_random_seed(SEED)
+# if PARALLEL:
+    # os.environ['MKL_NUM_THREADS'] = str(THREADS)
+    # os.environ['GOTO_NUM_THREADS'] = str(THREADS)
+    # os.environ['OMP_NUM_THREADS'] = str(THREADS)
+    # os.environ['openmp'] = 'True'
+if not PARALLEL:
+            THREADS = 1
+DEVICE = '/CPU:0'
+tf.config.threading.set_intra_op_parallelism_threads(THREADS)
+tf.config.threading.set_inter_op_parallelism_threads(THREADS)
+tf.device(DEVICE)
+K.clear_session()
 
 if PLOT:
     import matplotlib as mpl
@@ -118,7 +129,7 @@ if VERBOSE:
     print('projections:               %d' % NP)
     print('clustering:                %s' % CLST)
     print('clusters:                  %d' % NC)
-    print('backend:                   %s' % BACKEND)
+    # print('backend:                   %s' % BACKEND)
     print('network:                   %s' % 'cnn1d')
     print('epochs:                    %d' % EP)
     print('learning rate:             %.2e' % LR)
@@ -141,7 +152,7 @@ with open(OUTPREF+'.out', 'w') as out:
     out.write('# projections:               %d\n' % NP)
     out.write('# clustering:                %s\n' % CLST)
     out.write('# clusters:                  %d\n' % NC)
-    out.write('# backend:                   %s\n' % BACKEND)
+    # out.write('# backend:                   %s\n' % BACKEND)
     out.write('# network:                   %s\n' % 'cnn1d')
     out.write('# epochs:                    %d\n' % EP)
     out.write('# learning rate:             %.2e\n' % LR)
@@ -149,11 +160,11 @@ with open(OUTPREF+'.out', 'w') as out:
 
 EPS = 0.025 # np.finfo(np.float32).eps
 # load data
-R = pickle.load(open(CWD+'/sga.r.pickle', 'rb'))[:MI]
-UT = pickle.load(open(CWD+'/sga.corr.t.pickle', 'rb'))
-ST = pickle.load(open(CWD+'/sga.spin.t.pickle', 'rb'))
-UDAT = pickle.load(open(CWD+'/sga.corr.pickle', 'rb'))[:MI]
-SDAT = pickle.load(open(CWD+'/sga.spin.pickle', 'rb'))[:MI].astype(np.float32)
+R = np.load(CWD+'/sga.dat.npy')[:MI]
+UT = np.load(CWD+'/sga.cor.t.npy')
+ST = np.load(CWD+'/sga.dmp.t.npy')
+UDAT = np.load(CWD+'/sga.cor.npy')[:MI]
+SDAT = np.load(CWD+'/sga.dmp.npy')[:MI].astype(np.float32)
 # data shape
 UND, UNS, UNF = UDAT.shape
 SND, SNS, SNF = SDAT.shape
@@ -254,23 +265,22 @@ if VERBOSE:
 
 # scale unsupervised data
 try:
-    FUDOM = pickle.load(open(CWD+'/sga.%d.%s.fudat.k.pickle' % (MI, SCLR), 'rb'))
+    FUDOM = np.load(CWD+'/sga.%d.%s.fudat.k.npy' % (MI, SCLR))
     FUNF = FUDOM.size
-    FUDAT = pickle.load(open(CWD+'/sga.%d.%s.fudat.pickle' % (MI, SCLR), 'rb')).reshape(UND*UNS, FUNF)
+    FUDAT = np.load(CWD+'/sga.%d.%s.fudat.npy' % (MI, SCLR)).reshape(UND*UNS, FUNF)
     FUDAT = np.concatenate((np.real(FUDAT), np.imag(FUDAT)), axis=1)
-    SUDAT = pickle.load(open(CWD+'/sga.%d.%s.sudat.pickle' % (MI, SCLR), 'rb')).reshape(UND*UNS, 2*FUNF)
+    SUDAT = np.load(CWD+'/sga.%d.%s.sudat.npy' % (MI, SCLR)).reshape(UND*UNS, 2*FUNF)
     if VERBOSE:
         print('scaled unsupervised data loaded from file')
 except:
     FUDOM = np.fft.rfftfreq(UNF, 1)[1:]
     FUNF = FUDOM.size
     FUDAT = np.fft.rfft(UDAT.reshape(UND*UNS, UNF))[:, 1:]
-    pickle.dump(FUDOM, open(CWD+'/sga.%d.%s.fudat.k.pickle' % (MI, SCLR), 'wb'))
-    pickle.dump(FUDAT.reshape(UND, UNS, FUNF), open(CWD+'/sga.%d.%s.fudat.pickle' % (MI, SCLR), 'wb'))
+    np.save(CWD+'/sga.%d.%s.fudat.k.npy' % (MI, SCLR), FUDOM)
+    np.save(CWD+'/sga.%d.%s.fudat.npy' % (MI, SCLR), FUDAT.reshape(UND, UNS, FUNF))
     FUDAT = np.concatenate((np.real(FUDAT), np.imag(FUDAT)), axis=1)
     SUDAT = SCLRS[SCLR].fit_transform(FUDAT)
-    pickle.dump(SUDAT.reshape(UND, UNS, 2*FUNF), open(CWD+'/sga.%d.%s.sudat.pickle' \
-                                                      % (MI, SCLR), 'wb'))
+    np.save(CWD+'/sga.%d.%s.sudat.npy' % (MI, SCLR), SUDAT.reshape(UND, UNS, 2*FUNF))
     if VERBOSE:
         print('unsupervised data scaled')
 if VERBOSE:
@@ -278,19 +288,18 @@ if VERBOSE:
 
 # pca reduce unsupervised data
 try:
-    EVAR = pickle.load(open(CWD+'/sga.%d.%s.evar.pickle' % (MI, SCLR), 'rb'))
-    PUDAT = pickle.load(open(CWD+'/sga.%d.%s.pudat.pickle' % (MI, SCLR), 'rb')).reshape(UND*UNS, len(EVAR))
-    PCOMP = pickle.load(open(CWD+'/sga.%d.%s.pcomp.pickle' % (MI, SCLR), 'rb'))
+    EVAR = np.load(CWD+'/sga.%d.%s.evar.npy' % (MI, SCLR))
+    PUDAT = np.load(CWD+'/sga.%d.%s.pudat.npy' % (MI, SCLR)).reshape(UND*UNS, len(EVAR))
+    PCOMP = np.load(CWD+'/sga.%d.%s.pcomp.npy' % (MI, SCLR))
     if VERBOSE:
         print('pca reduced unsupervised data loaded from file')
 except:
     PUDAT = RDCNS['pca'].fit_transform(SUDAT)
     EVAR = RDCNS['pca'].explained_variance_ratio_
     PCOMP = RDCNS['pca'].components_
-    pickle.dump(PUDAT.reshape(UND, UNS, len(EVAR)),
-                open(CWD+'/sga.%d.%s.pudat.pickle' % (MI, SCLR), 'wb'))
-    pickle.dump(EVAR, open(CWD+'/sga.%d.%s.evar.pickle' % (MI, SCLR), 'wb'))
-    pickle.dump(PCOMP, open(CWD+'/sga.%d.%s.pcomp.pickle' % (MI, SCLR), 'wb'))
+    np.save(CWD+'/sga.%d.%s.pudat.npy' % (MI, SCLR), PUDAT.reshape(UND, UNS, len(EVAR)))
+    np.save(CWD+'/sga.%d.%s.evar.npy' % (MI, SCLR), EVAR)
+    np.save(CWD+'/sga.%d.%s.pcomp.npy' % (MI, SCLR), PCOMP)
     if VERBOSE:
         print('unsupervised data pca reduced')
 if VERBOSE:
@@ -310,15 +319,13 @@ with open(OUTPREF+'.out', 'a') as out:
 
 # reduction of unsupervised data
 try:
-    RUDAT = pickle.load(open(CWD+'/sga.%d.%s.%s.%d.rudat.pickle' \
-                             % (MI, SCLR, RDCN, NP), 'rb')).reshape(UND*UNS, NP)
+    RUDAT = np.load(CWD+'/sga.%d.%s.%s.%d.rudat.npy' % (MI, SCLR, RDCN, NP)).reshape(UND*UNS, NP)
     if VERBOSE:
         print('nonlinearly reduced unsupervised data loaded from file')
 except:
     if RDCN not in ('none', 'pca'):
         RUDAT = RDCNS[RDCN].fit_transform(PUDAT)
-        pickle.dump(RUDAT.reshape(UND, UNS, NP), open(CWD+'/sga.%d.%s.%s.%d.rudat.pickle' \
-                                                      % (MI, SCLR, RDCN, NP), 'wb'))
+        np.save(CWD+'/sga.%d.%s.%s.%d.rudat.npy' % (MI, SCLR, RDCN, NP), RUDAT.reshape(UND, UNS, NP))
         if RDCN == 'tsne' and VERBOSE:
             print(66*'-')
         if VERBOSE:
@@ -331,8 +338,7 @@ except:
 if VERBOSE:
     print(np.max([66, 10+8*NC])*'-')
 try:
-    UPRED = pickle.load(open(CWD+'/sga.%d.%s.%s.%d.%s.%d.upred.pickle' \
-                             % (MI, SCLR, RDCN, NP, CLST, NC), 'rb')).reshape(UND*UNS)
+    UPRED = np.load(CWD+'/sga.%d.%s.%s.%d.%s.%d.upred.npy' % (MI, SCLR, RDCN, NP, CLST, NC)).reshape(UND*UNS)
     if VERBOSE:
         print('clustered unsupervised data loaded from file')
 except:
@@ -342,8 +348,7 @@ except:
     for i in range(NC):
         UPRED[UPRED == IUCM[i]] = i+NC
     UPRED -= NC
-    pickle.dump(UPRED.reshape(UND, UNS), open(CWD+'/sga.%d.%s.%s.%d.%s.%d.upred.pickle' \
-                                              % (MI, SCLR, RDCN, NP, CLST, NC), 'wb'))
+    np.save(CWD+'/sga.%d.%s.%s.%d.%s.%d.upred.npy' % (MI, SCLR, RDCN, NP, CLST, NC), UPRED.reshape(UND, UNS))
     if VERBOSE:
         print('unsupervised data clustered')
 UCM = [np.mean(RS[UPRED == i]) for i in range(NC)]
@@ -392,29 +397,24 @@ with open(OUTPREF+'.out', 'a') as out:
 
 # scale supervised data
 try:
-    SSDAT = pickle.load(open(CWD+'/sga.%d.%s.ssdat.pickle' % (MI, SCLR), 'rb')).reshape(SND*SNS, SNF)
+    SSDAT = np.load(CWD+'/sga.%d.%s.ssdat.npy' % (MI, SCLR)).reshape(SND*SNS, SNF)
     if VERBOSE:
         print(66*'-')
         print('scaled supervised data loaded from file')
 except:
     SCLRS[SCLR].fit(np.real(SDAT.reshape(SND*SNS, SNF)[(UPRED == 0) | (UPRED == NC-1)]))
     SSDAT = SCLRS[SCLR].transform(SDAT.reshape(SND*SNS, SNF))
-    pickle.dump(SSDAT.reshape(SND, SNS, SNF), open(CWD+'/sga.%d.%s.ssdat.pickle' \
-                                                   % (MI, SCLR), 'wb'))
+    np.save(CWD+'/sga.%d.%s.ssdat.npy' % (MI, SCLR), SSDAT.reshape(SND, SNS, SNF))
     if VERBOSE:
         print(125*'-')
         print('supervised data scaled')
 
 # fit neural network to training data and predict classification data
 try:
-    LOSS = pickle.load(open(CWD+'/sga.%d.%s.%s.%d.%s.%d.cnn1d.%d.%.0e.loss.pickle' \
-                            % (MI, SCLR, RDCN, NP, CLST, NC, EP, LR), 'rb'))
-    MAE = pickle.load(open(CWD+'/sga.%d.%s.%s.%d.%s.%d.cnn1d.%d.%.0e.mae.pickle' \
-                           % (MI, SCLR, RDCN, NP, CLST, NC, EP, LR), 'rb'))
-    ACC = pickle.load(open(CWD+'/sga.%d.%s.%s.%d.%s.%d.cnn1d.%d.%.0e.acc.pickle' \
-                           % (MI, SCLR, RDCN, NP, CLST, NC, EP, LR), 'rb'))
-    SPROB = pickle.load(open(CWD+'/sga.%d.%s.%s.%d.%s.%d.cnn1d.%d.%.0e.sprob.pickle' \
-                             % (MI, SCLR, RDCN, NP, CLST, NC, EP, LR), 'rb'))
+    LOSS = np.load(CWD+'/sga.%d.%s.%s.%d.%s.%d.cnn1d.%d.%.0e.loss.npy' % (MI, SCLR, RDCN, NP, CLST, NC, EP, LR))
+    MAE = np.load(CWD+'/sga.%d.%s.%s.%d.%s.%d.cnn1d.%d.%.0e.mae.npy' % (MI, SCLR, RDCN, NP, CLST, NC, EP, LR))
+    ACC = np.load(CWD+'/sga.%d.%s.%s.%d.%s.%d.cnn1d.%d.%.0e.acc.npy' % (MI, SCLR, RDCN, NP, CLST, NC, EP, LR))
+    SPROB = np.load(CWD+'/sga.%d.%s.%s.%d.%s.%d.cnn1d.%d.%.0e.sprob.npy' % (MI, SCLR, RDCN, NP, CLST, NC, EP, LR))
     if VERBOSE:
         print(66*'-')
         print('neural network fit loaded from file')
@@ -426,22 +426,18 @@ except:
                         np.ones(np.sum(CUPRED[:, NC-1]), dtype=np.uint16)), 0)
     NN.fit(SSDAT[(UPRED == 0) | (UPRED == NC-1), :, np.newaxis], LBLS)
     LOSS = NN.model.history.history['loss']
-    MAE = NN.model.history.history['mean_absolute_error']
+    MAE = NN.model.history.history['mae']
     ACC = NN.model.history.history['acc']
-    pickle.dump(LOSS, open(CWD+'/sga.%d.%s.%s.%d.%s.%d.cnn1d.%d.%.0e.loss.pickle' \
-                           % (MI, SCLR, RDCN, NP, CLST, NC, EP, LR), 'wb'))
-    pickle.dump(MAE, open(CWD+'/sga.%d.%s.%s.%d.%s.%d.cnn1d.%d.%.0e.mae.pickle' \
-                          % (MI, SCLR, RDCN, NP, CLST, NC, EP, LR), 'wb'))
-    pickle.dump(ACC, open(CWD+'/sga.%d.%s.%s.%d.%s.%d.cnn1d.%d.%.0e.acc.pickle' \
-                          % (MI, SCLR, RDCN, NP, CLST, NC, EP, LR), 'wb'))
+    np.save(CWD+'/sga.%d.%s.%s.%d.%s.%d.cnn1d.%d.%.0e.loss.npy' % (MI, SCLR, RDCN, NP, CLST, NC, EP, LR), LOSS)
+    np.save(CWD+'/sga.%d.%s.%s.%d.%s.%d.cnn1d.%d.%.0e.mae.npy' % (MI, SCLR, RDCN, NP, CLST, NC, EP, LR), MAE)
+    np.save(CWD+'/sga.%d.%s.%s.%d.%s.%d.cnn1d.%d.%.0e.acc.npy' % (MI, SCLR, RDCN, NP, CLST, NC, EP, LR), ACC)
     if VERBOSE:
         print(125*'-')
         print('neural network fitted to training data')
         print(66*'-')
     # predict classification data
     SPROB = NN.predict_proba(SSDAT[:, :, np.newaxis])[:, 1].reshape(SND, SNS)
-    pickle.dump(SPROB, open(CWD+'/sga.%d.%s.%s.%d.%s.%d.cnn1d.%d.%.0e.sprob.pickle' \
-                            % (MI, SCLR, RDCN, NP, CLST, NC, EP, LR), 'wb'))
+    np.save(CWD+'/sga.%d.%s.%s.%d.%s.%d.cnn1d.%d.%.0e.sprob.npy' % (MI, SCLR, RDCN, NP, CLST, NC, EP, LR), SPROB)
 
 MSPROB = np.mean(SPROB, 1)
 SSPROB = np.std(SPROB, 1)
@@ -451,9 +447,7 @@ SCM = [np.mean(RS[SPRED.reshape(-1) == i]) for i in range(2)]
 # transition prediction
 FITG = (1.0, UTRANS)
 STRANS, SERR, SDOM, SVAL = odr_fit(MSPROB, SSPROB)
-pickle.dump(np.array([STRANS, SERR], dtype=np.float32),
-            open(CWD+'/sga.%d.%s.%s.%d.%s.%d.cnn1d.%d.%.0e.strans.pickle' \
-                 % (MI, SCLR, RDCN, NP, CLST, NC, EP, LR), 'wb'))
+np.save(CWD+'/sga.%d.%s.%s.%d.%s.%d.cnn1d.%d.%.0e.strans.npy' % (MI, SCLR, RDCN, NP, CLST, NC, EP, LR), np.array([STRANS, SERR], dtype=np.float32))
 
 if VERBOSE:
     print(66*'-')

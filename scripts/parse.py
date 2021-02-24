@@ -7,7 +7,6 @@ Created on Mon Jul 02 21:24:12 2018
 
 import argparse
 import os
-import pickle
 import numpy as np
 from tqdm import tqdm
 
@@ -24,27 +23,29 @@ CWD = os.getcwd()
 
 # system data directory and feature count
 DIR = CWD+'/data/'
-if 'b100' in CWD:
+if '400spin' in CWD:
     NF = 400
-if 'b150' in CWD:
+if '512spin' in CWD:
+    NF = 512
+if '600spin' in CWD:
     NF = 600
 # data file listing
 FLS = [file for file in os.listdir(DIR) if '.dat' in file]
 # r-values (parameter for density of states)
-R = np.array([np.float32(FLS[i][6:10]) for i in range(len(FLS))])
+R = np.array([np.float32(FLS[i][:4]) for i in range(len(FLS))])
 # dump r-values and feature time domain
-pickle.dump(R, open(CWD+'/sga.r.pickle', 'wb'))
-pickle.dump(np.arange(NF, dtype=np.int16), open(CWD+'/sga.spin.t.pickle', 'wb'))
+np.save(CWD+'/sga.dat.npy', R)
+np.save(CWD+'/sga.dmp.t.npy', np.arange(NF, dtype=np.int16))
 if VERBOSE:
     print('r parameters and feature time domain dumped')
 # parse data
 if VERBOSE:
-    DAT = np.array([np.loadtxt(DIR+FLS[i], dtype=np.int16)[NF:, 1].reshape(-1, NF) \
+    DMP = np.array([np.loadtxt(DIR+FLS[i], dtype=np.int16)[NF:, 1].reshape(-1, NF) \
                     for i in tqdm(range(len(FLS)))])
 else:
-    DAT = np.array([np.loadtxt(DIR+FLS[i], dtype=np.int16)[NF:, 1].reshape(-1, NF) \
+    DMP = np.array([np.loadtxt(DIR+FLS[i], dtype=np.int16)[NF:, 1].reshape(-1, NF) \
                     for i in range(len(FLS))])
 # dump data
-pickle.dump(DAT, open(CWD+'/sga.spin.pickle', 'wb'))
+np.save(CWD+'/sga.dmp.npy', DMP)
 if VERBOSE:
     print('feature data dumped')

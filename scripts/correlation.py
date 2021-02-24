@@ -7,7 +7,6 @@ Created on Mon Jul 02 21:24:48 2018
 
 import argparse
 import os
-import pickle
 import numpy as np
 import numba as nb
 from tqdm import tqdm
@@ -56,16 +55,16 @@ if __name__ == '__main__':
     CWD = os.getcwd()
     VERBOSE, PARALLEL, NWORKER, NTHREAD = parse_args()
     # load data
-    R = pickle.load(open(CWD+'/sga.r.pickle', 'rb'))
-    ST = pickle.load(open(CWD+'/sga.spin.t.pickle', 'rb'))
-    DAT = pickle.load(open(CWD+'/sga.spin.pickle', 'rb'))
+    R = np.load(CWD+'/sga.dat.npy')
+    ST = np.load(CWD+'/sga.dmp.t.npy')
+    DMP = np.load(CWD+'/sga.dmp.npy')
     if VERBOSE:
         print('data loaded')
     # data shape
-    NR, NS, NF = DAT.shape
+    NR, NS, NF = DMP.shape
     # time domain
     CT = ST-ST[np.int(ST.size/2)]
-    pickle.dump(CT, open(CWD+'/sga.corr.t.pickle', 'wb'))
+    np.save(CWD+'/sga.cor.t.npy', CT)
     if VERBOSE:
         print('correlation time domain dumped')
     # correlation array
@@ -90,7 +89,7 @@ if __name__ == '__main__':
         if VERBOSE:
             client_info()
         # submit futures to client for computation
-        OPERS = [delayed(correlation)(CT, DAT[i, j], CORR[i, j]) \
+        OPERS = [delayed(correlation)(CT, DMP[i, j], CORR[i, j]) \
                  for i in range(NR) for j in range(NS)]
         FUTURES = CLIENT.compute(OPERS)
         # progress bar
@@ -110,11 +109,11 @@ if __name__ == '__main__':
         if VERBOSE:
             for i in tqdm(range(NR)):
                 for j in tqdm(range(NS)):
-                    CORR[i, j] = correlation(CT, DAT[i, j], CORR[i, j])
+                    CORR[i, j] = correlation(CT, DMP[i, j], CORR[i, j])
         else:
             for i in range(NR):
                 for j in range(NS):
-                    CORR[i, j] = correlation(CT, DAT[i, j], CORR[i, j])
-    pickle.dump(CORR, open(CWD+'/sga.corr.pickle', 'wb'))
+                    CORR[i, j] = correlation(CT, DMP[i, j], CORR[i, j])
+    np.save(CWD+'/sga.cor.npy', CORR)
     if VERBOSE:
         print('\ncorrelations dumped')
